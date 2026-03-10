@@ -1,4 +1,4 @@
-name: ChromeOS-Hatch-Tailscale-Final
+name: ChromeOS-Hatch-Final-Success
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   build-and-run:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Maximize Server Space
+      - name: 1. Optimize Server Space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo docker image prune -a -f
@@ -17,24 +17,23 @@ jobs:
           sudo apt update
           sudo apt install -y unzip tar pv jq qemu-kvm qemu-utils
 
-      - name: 3. Download Files (Safe Method)
+      - name: 3. Download Files from Your Drive
         run: |
-          # تحميل ملف Hatch Recovery
+          # تحميل نسخة Hatch Recovery (ملفك الأول)
           curl -L "https://drive.google.com/uc?export=download&id=1VuhGxGRVrIVqKN2l0AZE0tzLh03VbIou" -o hatch.zip
           
-          # تحميل ملف Brunch الذي رفعته أنت (باستخدام الـ ID الخاص بك)
+          # تحميل محرك Brunch (رابطك الجديد)
           curl -L "https://drive.google.com/uc?export=download&id=1amBG8ijogsOWqJKu0kSud27ZVb0wXPpa" -o brunch.tar.gz
 
-      - name: 4. Extract and Build
+      - name: 4. Extract and Build Image
         run: |
-          # فك ضغط Brunch مع التحقق من الصيغة
-          file brunch.tar.gz
+          echo "Extracting Brunch..."
           tar -xvf brunch.tar.gz
           
-          # فك ضغط نسخة النظام
+          echo "Extracting Hatch..."
           unzip hatch.zip
           
-          # بناء الصورة
+          echo "Building ChromeOS System (Hatch)..."
           sudo bash chromeos-install.sh -src *.bin -dst chromeos.img
 
       - name: 5. Connect to Tailscale
@@ -42,17 +41,20 @@ jobs:
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
 
-      - name: 6. Run ChromeOS
+      - name: 6. Run ChromeOS with RDP
         run: |
+          # تشغيل النظام برامات 7 جيجا
           docker run -d --name chromeos --device /dev/kvm -p 3389:3389 \
           -v $(pwd)/chromeos.img:/image/chromeos.img \
           -e RAM=7 -e CORES=2 sickcodes/docker-chromeos:latest
 
-      - name: 7. Get IP and Keep Alive
+      - name: 7. Get IP Address
         run: |
           echo "===================================================="
-          echo "✅ النظام يعمل الآن على شبكة Tailscale الخاصة بك!"
-          echo "🔗 استخدم عنوان IP الخاص بالـ Runner للاتصال عبر RDP."
+          echo "✅ النظام يعمل الآن!"
+          echo "🔗 اتصل عبر RDP باستخدام هذا الـ IP:"
           tailscale ip -4
           echo "===================================================="
-          while true; do sleep 300; done
+
+      - name: 8. Keep Alive
+        run: while true; do sleep 300; done
