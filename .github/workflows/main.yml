@@ -1,1 +1,63 @@
+name: ChromeOS-Hatch-Fix-Extraction
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Maximize Server Resources
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo docker image prune -a -f
+
+      - name: 2. Install Build Tools
+        run: |
+          sudo apt update
+          sudo apt install -y unzip tar pv jq qemu-kvm qemu-utils
+
+      - name: 3. Download Hatch Recovery (From Drive)
+        run: |
+          # تحميل ملف النظام الضخم من درايف بطريقة آمنة
+          CONFIRM=$(curl -sc /tmp/cookie "https://drive.google.com/uc?export=download&id=1VuhGxGRVrIVqKN2l0AZE0tzLh03VbIou" | grep -TQ "confirm=[^&]+" | sed -E 's/.*confirm=([^&]+).*/\1/')
+          curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=1VuhGxGRVrIVqKN2l0AZE0tzLh03VbIou" -o hatch.zip
+
+      - name: 4. Download Brunch (Direct from GitHub)
+        run: |
+          # تحميل محرك برانش مباشرة لضمان سلامة الملف
+          wget https://github.com/sebanc/brunch/releases/download/r119/brunch_r119_stable_20231221.tar.gz -O brunch.tar.gz
+
+      - name: 5. Extract and Build System Image
+        run: |
+          echo "Extracting Brunch..."
+          tar -xvf brunch.tar.gz
+          
+          echo "Extracting Hatch Recovery..."
+          unzip hatch.zip
+          
+          echo "Building ChromeOS Image..."
+          # استخدام sudo لبناء الملف النهائي
+          sudo bash chromeos-install.sh -src *.bin -dst chromeos.img
+
+      - name: 6. Start System with RDP Bridge
+        run: |
+          docker run -d --name chromeos --device /dev/kvm -p 3389:3389 \
+          -v $(pwd)/chromeos.img:/image/chromeos.img \
+          -e RAM=7 -e CORES=2 sickcodes/docker-chromeos:latest
+
+      - name: 7. Setup Ngrok Tunnel
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update && sudo apt-get install ngrok -y
+          ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+          ngrok tcp 3389 &
+          sleep 40
+          echo "===================================================="
+          echo "🔗 رابط الـ RDP الجديد:"
+          curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' | sed 's/tcp:\/\///'
+          echo "===================================================="
+
+      - name: 8. Keep Session Alive
+        run: while true; do sleep 300; done
