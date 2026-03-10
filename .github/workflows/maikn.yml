@@ -1,0 +1,36 @@
+name: ChromeOS-RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  chromeos:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y docker.io qemu-kvm
+
+    - name: Enable KVM
+      run: |
+        sudo modprobe kvm
+        sudo chmod 666 /dev/kvm || true
+
+    - name: Run ChromeOS Container
+      run: |
+        docker run -d \
+        --name chromeos \
+        --device /dev/kvm \
+        -p 3389:3389 \
+        -e RAM=6 \
+        -e CORES=2 \
+        -e EXTRA="-vga virtio -display none -usb -device usb-tablet" \
+        sickcodes/docker-chromeos:latest
+
+    - name: Show Connection Info
+      run: |
+        echo "Connect using RDP"
+        curl ifconfig.me
