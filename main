@@ -1,4 +1,4 @@
-name: ChromeOS-Hatch-Final-Success
+name: ChromeOS-Hatch-Direct-Success
 
 on:
   workflow_dispatch:
@@ -7,33 +7,34 @@ jobs:
   build-and-run:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Optimize Server Space
+      - name: 1. Maximize Server Performance
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo docker image prune -a -f
 
-      - name: 2. Install Dependencies
+      - name: 2. Install Essentials
         run: |
-          sudo apt update
-          sudo apt install -y unzip tar pv jq qemu-kvm qemu-utils
+          sudo apt update && sudo apt install -y unzip tar pv jq qemu-kvm qemu-utils
 
-      - name: 3. Download Files from Your Drive
+      - name: 3. Download Unified Package (Direct Link)
         run: |
-          # تحميل نسخة Hatch Recovery (ملفك الأول)
-          curl -L "https://drive.google.com/uc?export=download&id=1VuhGxGRVrIVqKN2l0AZE0tzLh03VbIou" -o hatch.zip
+          # استخدام الرابط المباشر لضمان تحميل الملف كاملاً (2GB+)
+          curl -L "https://drive.usercontent.google.com/download?id=19eWMfDpelImZVh-W8H9gn_F7kqLJwexG&export=download" -o package.zip
           
-          # تحميل محرك Brunch (رابطك الجديد)
-          curl -L "https://drive.google.com/uc?export=download&id=1amBG8ijogsOWqJKu0kSud27ZVb0wXPpa" -o brunch.tar.gz
+          # التحقق من حجم الملف في السجلات (Logs)
+          ls -lh package.zip
 
-      - name: 4. Extract and Build Image
+      - name: 4. Extract and Build System
         run: |
-          echo "Extracting Brunch..."
-          tar -xvf brunch.tar.gz
+          echo "Extracting Package..."
+          unzip -o package.zip
           
-          echo "Extracting Hatch..."
-          unzip hatch.zip
+          echo "Extracting Frameworks..."
+          find . -name "*.tar.gz" -exec tar -xvf {} \;
+          find . -name "chromeos_*.zip" -exec unzip -o {} \;
           
-          echo "Building ChromeOS System (Hatch)..."
+          echo "Building Official ChromeOS Image..."
+          # بناء النظام بهوية Hatch الأصلية لدعم الهدايا
           sudo bash chromeos-install.sh -src *.bin -dst chromeos.img
 
       - name: 5. Connect to Tailscale
@@ -41,20 +42,28 @@ jobs:
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
 
-      - name: 6. Run ChromeOS with RDP
+      - name: 6. Intelligent Launch (Auto RAM & CPU)
         run: |
-          # تشغيل النظام برامات 7 جيجا
+          # تخصيص الرامات تلقائياً (تأخذ 85% من قوة السيرفر)
+          TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
+          ALLOCATED_RAM=$((TOTAL_RAM - 1))
+          
+          echo "Allocating ${ALLOCATED_RAM}GB RAM for fast boot..."
+
           docker run -d --name chromeos --device /dev/kvm -p 3389:3389 \
           -v $(pwd)/chromeos.img:/image/chromeos.img \
-          -e RAM=7 -e CORES=2 sickcodes/docker-chromeos:latest
+          -e RAM=${ALLOCATED_RAM} \
+          -e CORES=$(nproc) \
+          -e EXTRA="-vga virtio -display none -usb -device usb-tablet" \
+          sickcodes/docker-chromeos:latest
 
-      - name: 7. Get IP Address
+      - name: 7. Status and Connection
         run: |
           echo "===================================================="
-          echo "✅ النظام يعمل الآن!"
-          echo "🔗 اتصل عبر RDP باستخدام هذا الـ IP:"
+          echo "✅ النظام جاهز الآن بأقصى سرعة!"
+          echo "🔗 عنوان الـ IP الخاص بك للاتصال (RDP):"
           tailscale ip -4
           echo "===================================================="
 
-      - name: 8. Keep Alive
+      - name: 8. Keep Session Alive
         run: while true; do sleep 300; done
