@@ -1,4 +1,4 @@
-name: ChromeOS-Hatch-Final-Victory
+name: ChromeOS-Hatch-Unified-ONLY
 
 on:
   workflow_dispatch:
@@ -12,40 +12,37 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo docker image prune -a -f
 
-      - name: 2. Install Essentials
+      - name: 2. Install Tools
         run: |
           sudo apt update && sudo apt install -y unzip tar pv jq qemu-kvm qemu-utils
 
-      - name: 3. Download Your Unified Package
+      - name: 3. Download Your Package (The Only Link)
         run: |
-          # تحميل الملف المدمج من الرابط المباشر الذي أرسلته
+          # التحميل من رابطك المباشر فقط
           curl -L "https://drive.usercontent.google.com/download?id=19eWMfDpelImZVh-W8H9gn_F7kqLJwexG&export=download" -o package.zip
-          
-          # التأكد من حجم الملف في السجلات (يجب أن يكون حجمه كبيراً)
           ls -lh package.zip
 
-      - name: 4. Forced Extraction and Build
+      - name: 4. Forced Extraction (Brunch + Hatch)
         run: |
           echo "Unzipping the main package..."
           unzip -o package.zip
           
           echo "Extracting internal components..."
-          # فك ضغط أي ملفات داخلية سواء كانت tar.gz أو zip
+          # استخراج أي ملف مضغوط داخلي فوراً
           find . -name "*.tar.gz" -exec tar -xvf {} \;
           find . -name "*.zip" ! -name "package.zip" -exec unzip -o {} \;
           
-          echo "Building Official ChromeOS Image..."
-          # دمج الملفات لبناء نسخة Hatch لدعم الهدايا
+          echo "Building Official Image..."
+          # بناء النظام مباشرة من الملفات المستخرجة
           sudo bash chromeos-install.sh -src *.bin -dst chromeos.img
 
-      - name: 5. Connect to Tailscale
+      - name: 5. Connect Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
 
-      - name: 6. Fast Boot Launch (Auto-RAM)
+      - name: 6. Intelligent Launch (Auto RAM)
         run: |
-          # تخصيص الرامات تلقائياً لضمان أسرع إقلاع
           TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
           ALLOCATED_RAM=$((TOTAL_RAM - 1))
           
@@ -56,12 +53,11 @@ jobs:
           -e EXTRA="-vga virtio -display none -usb -device usb-tablet" \
           sickcodes/docker-chromeos:latest
 
-      - name: 7. Get Connection IP
+      - name: 7. Status
         run: |
           echo "===================================================="
-          echo "✅ مبروك! النظام يعمل الآن."
           tailscale ip -4
           echo "===================================================="
 
-      - name: 8. Keep Session Alive
+      - name: 8. Keep Alive
         run: while true; do sleep 300; done
